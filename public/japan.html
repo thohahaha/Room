@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Realistic avatars — Networked-Aframe</title>
+    <meta name="description" content="Realistic avatars — Networked-Aframe" />
+
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="/easyrtc/easyrtc.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/networked-aframe@0.14.0/dist/networked-aframe.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fern-solutions/aframe-mirror@1.1.1/dist/mirror.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-cursor-teleport@1.6.0/dist/aframe-cursor-teleport-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AdaRoseCannon/aframe-xr-boilerplate@bca4792/simple-navmesh-constraint.js"></script>
+
+    <script src="/dist/components.js"></script>
+    <script defer src="/dist/ui.js"></script>
+  </head>
+
+  <body>
+    <a-scene
+      networked-scene="
+        connectOnLoad: false;
+        room: japan;
+        debug: true;
+        adapter: wseasyrtc;
+    "
+      shadow="type: pcfsoft"
+      gltf-model="meshoptDecoderPath:https://unpkg.com/meshoptimizer@0.19.0/meshopt_decoder.js"
+      raycaster="far: 100; objects: [link];"
+      cursor="rayOrigin: mouse"
+    >
+      <a-assets>
+        <template id="avatar-template">
+          <a-entity player-info>
+            <a-entity class="model">
+              <!-- here we add a text component for a nametag; the value will be updated by the player-info component -->
+              <a-text class="nametag" align="center" value="?" position="0 2.1 0" scale=".5 .5 .5"></a-text>
+            </a-entity>
+            <!-- <a-entity class="camera" position="0 1.6 0" networked-audio-source></a-entity> -->
+            <a-entity class="camera" position="0 1.6 0"></a-entity>
+          </a-entity>
+        </template>
+        <img id="thumbJapan" crossorigin="anonymous" src="https://cdn.aframe.io/link-traversal/thumbs/japan.png" />
+        <img id="thumbForest" crossorigin="anonymous" src="https://cdn.aframe.io/link-traversal/thumbs/forest.png" />
+      </a-assets>
+
+      <a-entity id="scene">
+        <a-entity environment="preset:japan;shadow:true"></a-entity>
+        <a-entity light="type:ambient;intensity:0.5"></a-entity>
+        <a-link
+          change-room="on:obbcollisionstarted;room:forest;url:index.html"
+          link="on:ignore"
+          href="forest"
+          position="-2 1.5 3"
+          image="#thumbForest"
+          ><a-box position="0 0 0.5" obb-collider visible="false"></a-box
+        ></a-link>
+      </a-entity>
+
+      <a-entity
+        id="rig"
+        cursor-teleport="cameraRig: #rig; cameraHead: #player; collisionEntities: .environmentGround; ignoreEntities: .clickable,[link]"
+        simple-navmesh-constraint="navmesh:.environmentGround,.environmentDressing;fall:10;height:0;exclude:.navmesh-hole;"
+        movement-controls="fly:false;controls: gamepad, trackpad, keyboard, nipple;"
+        spawn-in-circle="radius:1"
+        networked="template:#avatar-template;attachTemplateToLocal:false"
+        player-info
+      >
+        <a-entity id="player" class="camera" camera position="0 1.6 0" look-controls>
+          <a-box obb-collider visible="false" height="0.4" depth="0.4" width="0.4"></a-box>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>

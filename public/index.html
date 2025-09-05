@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Realistic avatars — Networked-Aframe</title>
+    <meta name="description" content="Realistic avatars — Networked-Aframe" />
+
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="/easyrtc/easyrtc.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/networked-aframe@0.14.0/dist/networked-aframe.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fern-solutions/aframe-mirror@1.1.1/dist/mirror.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-cursor-teleport@1.6.0/dist/aframe-cursor-teleport-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AdaRoseCannon/aframe-xr-boilerplate@bca4792/simple-navmesh-constraint.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-gltf-model-plus@1.0.0/dist/gltf-model-plus.min.js"></script>
+    <script>
+      window.uiSettings = {
+        showRandomAvatarButton: true,
+        showDieButton: true,
+      };
+    </script>
+    <script src="/dist/components.js"></script>
+    <script defer src="/dist/ui.js"></script>
+  </head>
+
+  <body>
+    <!--
+      To enable microphone, set the following settings in networked-scene below:
+
+        adapter: easyrtc;
+        audio: true;
+
+      and set networked-audio-source on the avatar-template template
+    -->
+    <a-scene
+      light="defaultLightsEnabled:false"
+      renderer="stencil:true"
+      networked-scene="
+        connectOnLoad: false;
+        room: forest;
+        debug: true;
+        adapter: wseasyrtc;
+        audio: false;
+        video: false;
+    "
+      shadow="type: pcfsoft"
+      gltf-model="meshoptDecoderPath:https://unpkg.com/meshoptimizer@0.19.0/meshopt_decoder.js"
+      raycaster="far: 100; objects: .clickable,[link];"
+      cursor="rayOrigin: mouse"
+    >
+      <a-assets>
+        <template id="avatar-template">
+          <a-entity player-info>
+            <a-entity class="model">
+              <!-- here we add a text component for a nametag; the value will be updated by the player-info component -->
+              <a-text class="nametag" align="center" value="?" position="0 2.1 0" scale=".5 .5 .5"></a-text>
+            </a-entity>
+            <a-entity class="camera" position="0 1.6 0"></a-entity>
+            <!-- <a-entity class="camera" position="0 1.6 0" networked-audio-source></a-entity> -->
+          </a-entity>
+        </template>
+        <img id="thumbJapan" crossorigin="anonymous" src="https://cdn.aframe.io/link-traversal/thumbs/japan.png" />
+        <img id="thumbForest" crossorigin="anonymous" src="https://cdn.aframe.io/link-traversal/thumbs/forest.png" />
+      </a-assets>
+
+      <a-entity id="scene">
+        <a-entity environment="preset:forest;shadow:true"></a-entity>
+        <a-entity light="type:ambient;intensity:0.5"></a-entity>
+        <a-mirror id="mirror" position="0 1.8 -3" scale="5 3 1" layers="0,3">
+          <a-box color="black" position="0 0 -0.02" scale="1.02 1.02 0.01"></a-box>
+        </a-mirror>
+        <a-link
+          change-room="on:obbcollisionstarted;room:japan;url:japan.html"
+          link="on:ignore"
+          href="japan"
+          position="-2 1.5 3"
+          image="#thumbJapan"
+          ><a-box position="0 0 0.5" obb-collider visible="false"></a-box
+        ></a-link>
+        <a-cylinder radius="0.25" height="0.4" position="1.5 0.2 -2" rotation="0 180 0">
+          <a-waypoint
+            id="seat1"
+            position="0 0.22 0"
+            can-be-clicked="true"
+            can-be-occupied="true"
+            will-disable-motion="true"
+          ></a-waypoint>
+        </a-cylinder>
+        <a-cylinder radius="0.25" height="0.4" position="0.3 0.2 -2" rotation="0 180 0">
+          <a-waypoint
+            id="seat2"
+            position="0 0.22 0"
+            can-be-clicked="true"
+            can-be-occupied="true"
+            will-disable-motion="true"
+          ></a-waypoint>
+        </a-cylinder>
+      </a-entity>
+
+      <a-entity
+        id="rig"
+        cursor-teleport="cameraRig: #rig; cameraHead: #player; collisionEntities: .environmentGround; ignoreEntities: .clickable,[link]"
+        simple-navmesh-constraint="navmesh:.environmentGround,.environmentDressing;fall:10;height:0;exclude:.navmesh-hole;"
+        movement-controls="fly:false;controls: gamepad, trackpad, keyboard, nipple;"
+        spawn-in-circle="radius:1"
+        networked="template:#avatar-template;attachTemplateToLocal:false"
+        player-info
+      >
+        <a-entity id="player" class="camera" camera position="0 1.6 0" look-controls>
+          <a-box obb-collider visible="false" height="0.4" depth="0.4" width="0.4"></a-box>
+        </a-entity>
+        <a-entity
+          id="left-hand"
+          networked-hand-controls="hand: left"
+          networked="template: #left-hand-default-template"
+          laser-controls="hand: left"
+          raycaster="showLine: true; far: 100; lineColor: white; objects: .clickable; interval:100;"
+          blink-controls="rotateOnTeleport: false; cameraRig: #rig; teleportOrigin: #player; collisionEntities: .navmesh;"
+        ></a-entity>
+        <a-entity
+          id="right-hand"
+          networked-hand-controls="hand:right"
+          networked="template:#right-hand-default-template"
+          laser-controls="hand: right"
+          raycaster="showLine: true; far: 100; lineColor: white; objects: .clickable; interval:100;"
+          blink-controls="rotateOnTeleport: false; cameraRig: #rig; teleportOrigin: #player; collisionEntities: .navmesh;"
+        ></a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>

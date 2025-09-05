@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Realistic avatars — Networked-Aframe</title>
+    <meta name="description" content="Realistic avatars — Networked-Aframe" />
+
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/networked-aframe@0.14.0/dist/networked-aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/networked-aframe/naf-janus-adapter@3.2.0/dist/naf-janus-adapter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/networked-aframe/naf-janus-adapter@3.2.0/examples/js/audio-system.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fern-solutions/aframe-mirror@1.1.1/dist/mirror.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-cursor-teleport@1.6.0/dist/aframe-cursor-teleport-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AdaRoseCannon/aframe-xr-boilerplate@bca4792/simple-navmesh-constraint.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-gltf-model-plus@1.0.0/dist/gltf-model-plus.min.js"></script>
+
+    <script src="/dist/components.js"></script>
+    <script defer src="/dist/ui.js"></script>
+  </head>
+
+  <body>
+    <!--
+      For development with janus adapter, networked-scene is configured with:
+
+        adapter: janus
+        serverURL: wss://192.168.1.15:8081/janus;
+
+      Run janus container locally with webpack dev server in front for https:
+
+      cd janus-plugin-sfu/docker
+      docker compose up
+
+      cd naf-valid-avatars
+      npm run dev2 # to have https on port 8080
+
+      cd naf-janus-adapter
+      npm start # to have https proxy on 8081 to janus http://127.0.0.1:8188/janus
+
+      go to https://192.168.1.15:8081/janus to accept the certificate, close the tab
+      go to https://192.168.1.15:8080/janus.html
+    -->
+    <a-scene
+      light="defaultLightsEnabled:false"
+      renderer="stencil:true"
+      networked-scene="
+        connectOnLoad: false;
+        room: forest;
+        debug: true;
+        adapter: janus;
+        serverURL: wss://192.168.1.15:8081/janus;
+    "
+      shadow="type: pcfsoft"
+      gltf-model="meshoptDecoderPath:https://unpkg.com/meshoptimizer@0.19.0/meshopt_decoder.js"
+      raycaster="far: 100; objects: .clickable,[link];"
+      cursor="rayOrigin: mouse"
+    >
+      <a-assets>
+        <template id="avatar-template">
+          <a-entity player-info>
+            <a-entity class="model">
+              <!-- here we add a text component for a nametag; the value will be updated by the player-info component -->
+              <a-text class="nametag" align="center" value="?" position="0 2.1 0" scale=".5 .5 .5"></a-text>
+            </a-entity>
+            <a-entity class="camera" position="0 1.6 0" networked-audio-source></a-entity>
+          </a-entity>
+        </template>
+      </a-assets>
+
+      <a-entity id="scene">
+        <a-entity environment="preset:forest;shadow:true"></a-entity>
+        <a-entity light="type:ambient;intensity:0.5"></a-entity>
+        <a-mirror id="mirror" position="0 1.8 -3" scale="5 3 1" layers="0,3">
+          <a-box color="black" position="0 0 -0.02" scale="1.02 1.02 0.01"></a-box>
+        </a-mirror>
+        <a-plane
+          id="screenshare"
+          width="4.64"
+          height="2.64"
+          material="color: black"
+          position="6 2 6"
+          rotation="0 -90 0"
+          networked="template: #media-template; attachTemplateToLocal: false; networkId: screenshare; persistent: true; owner: scene"
+          video-texture-target
+          media-frame="bounds: 4.6 0.02 2.6; mediaType: all-2d"
+        ></a-plane>
+      </a-entity>
+
+      <a-entity
+        id="rig"
+        cursor-teleport="cameraRig: #rig; cameraHead: #player; collisionEntities: .environmentGround; ignoreEntities: .clickable,[link]"
+        simple-navmesh-constraint="navmesh:.environmentGround,.environmentDressing;fall:10;height:0;exclude:.navmesh-hole;"
+        movement-controls="fly:false;controls: gamepad, trackpad, keyboard, nipple;"
+        spawn-in-circle="radius:1"
+        networked="template:#avatar-template;attachTemplateToLocal:false"
+        player-info
+      >
+        <a-entity id="player" class="camera" camera position="0 1.6 0" look-controls>
+          <a-box obb-collider visible="false" height="0.4" depth="0.4" width="0.4"></a-box>
+        </a-entity>
+        <a-entity
+          id="left-hand"
+          networked-hand-controls="hand: left"
+          networked="template: #left-hand-default-template"
+          laser-controls="hand: left"
+          raycaster="showLine: true; far: 100; lineColor: white; objects: .clickable; interval:100;"
+          blink-controls="rotateOnTeleport: false; cameraRig: #rig; teleportOrigin: #player; collisionEntities: .navmesh;"
+        ></a-entity>
+        <a-entity
+          id="right-hand"
+          networked-hand-controls="hand:right"
+          networked="template:#right-hand-default-template"
+          laser-controls="hand: right"
+          raycaster="showLine: true; far: 100; lineColor: white; objects: .clickable; interval:100;"
+          blink-controls="rotateOnTeleport: false; cameraRig: #rig; teleportOrigin: #player; collisionEntities: .navmesh;"
+        ></a-entity>
+      </a-entity>
+    </a-scene>
+    <script>
+      function genClientId() {
+        return String(crypto.getRandomValues(new Uint32Array(1))[0]);
+      }
+
+      const setupPeerConnectionConfig = (adapter, iceServers) => {
+        const qs = new URLSearchParams(location.search);
+        const forceTurn = qs.get('force_turn');
+        const forceTcp = qs.get('force_tcp');
+        const peerConnectionConfig = {};
+
+        if (iceServers && iceServers.urls !== null) {
+          if (forceTcp) {
+            iceServers.urls = iceServers.urls.filter((url) => url.startsWith('turn') && url.endsWith('tcp'));
+          }
+          const hasStunServer = !!iceServers.urls.find((url) => url.startsWith('stun'));
+          const newIceServers = [];
+          if (!forceTcp && !forceTurn && !hasStunServer) {
+            newIceServers.push({ urls: 'stun:stun1.l.google.com:19302' });
+          }
+          // remove __typename from the graphql query
+          newIceServers.push({
+            username: iceServers.username,
+            credential: iceServers.credential,
+            urls: iceServers.urls,
+          });
+
+          peerConnectionConfig.iceServers = newIceServers;
+
+          if (forceTurn || forceTcp) {
+            peerConnectionConfig.iceTransportPolicy = 'relay';
+          }
+        } else {
+          peerConnectionConfig.iceServers = [
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+          ];
+        }
+
+        adapter.setPeerConnectionConfig(peerConnectionConfig);
+      };
+
+      // Prompt for audio.
+      document.addEventListener('DOMContentLoaded', () => {
+        const scene = document.querySelector('a-scene');
+        const micBtnEl = document.getElementById('mic-btn');
+
+        scene.addEventListener('adapter-ready', ({ detail: adapter }) => {
+          // See https://github.com/networked-aframe/naf-janus-adapter/issues/14 to properly protect the credentials of the turn server
+          // const iceServers = {
+          //   credential: 'TheCredential',
+          //   urls: [
+          //     'stun:fr-turn6.xirsys.com',
+          //     'turn:fr-turn6.xirsys.com:80?transport=udp',
+          //     'turn:fr-turn6.xirsys.com:3478?transport=udp',
+          //     'turn:fr-turn6.xirsys.com:80?transport=tcp',
+          //     'turn:fr-turn6.xirsys.com:3478?transport=tcp',
+          //     'turns:fr-turn6.xirsys.com:443?transport=tcp',
+          //     'turns:fr-turn6.xirsys.com:5349?transport=tcp',
+          //   ],
+          //   username: 'TheUserName',
+          // };
+          const iceServers = {
+            urls: ['stun:stun1.l.google.com:19302'],
+          };
+          setupPeerConnectionConfig(adapter, iceServers);
+
+          // See https://github.com/networked-aframe/naf-janus-adapter/issues/48 to better handle the connection error.
+          // Here we just log the error to not have an infinite reconnection.
+          adapter.onReconnectionError = () => console.error('connect_error');
+          adapter.onReconnected = () => {
+            console.log('reconnected');
+          };
+
+          const clientId = genClientId();
+          adapter.setClientId(clientId);
+          navigator.mediaDevices
+            .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+            .then((stream) => {
+              const audioSystem = scene.systems.audio;
+              audioSystem.addStreamToOutboundAudio('microphone', stream);
+              adapter.setLocalMediaStream(audioSystem.outboundStream).then(() => {
+                // adapter.enableMicrophone(state.micEnabled);
+              });
+            })
+            .catch((err) => {
+              console.warn('Microphone access not allowed. This client will not broadcast audio.');
+            });
+        });
+      });
+    </script>
+  </body>
+</html>

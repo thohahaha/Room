@@ -1,0 +1,143 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import './colors.css';
+
+@layer base {
+  input,
+  textarea,
+  select {
+    @apply text-gray-900;
+  }
+
+  a {
+    @apply text-sky-800;
+  }
+
+  a:hover {
+    @apply text-sky-800 underline;
+  }
+}
+
+@layer components {
+  /* Override the blue set by @tailwindcss/forms */
+  .form-input:focus,
+  .form-textarea:focus,
+  .form-select:focus,
+  .form-multiselect:focus {
+    --tw-ring-color: var(--btn-primary-bg);
+    border-color: var(--btn-primary-bg);
+  }
+
+  .form-checkbox,
+  .form-radio {
+    color: var(--btn-primary-bg);
+  }
+
+  .form-checkbox:focus,
+  .form-radio:focus {
+    --tw-ring-color: var(--btn-primary-bg);
+  }
+
+  .bg-panel {
+    background-color: var(--panel-bg);
+    color: var(--panel-text);
+  }
+
+  .btn {
+    @apply inline-block p-2 font-bold shadow-md transition duration-150 ease-in-out;
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    border-radius: var(--btn-border-radius);
+
+    &:hover,
+    &.hover {
+      background-color: var(--btn-primary-bg-hover);
+    }
+  }
+
+  .btn-secondary {
+    @apply btn;
+    background-color: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+
+    &:hover,
+    &.hover {
+      background-color: var(--btn-secondary-bg-hover);
+    }
+
+    &.active {
+      background-color: var(--btn-primary-bg);
+    }
+  }
+
+  .btn-rounded {
+    @apply rounded-full;
+  }
+
+  /* For the send button in ChatPanel */
+  .btn-in-input {
+    @apply text-gray-600;
+    &:hover {
+      color: var(--btn-primary-bg-hover);
+    }
+    &[disabled],
+    &[disabled]:hover {
+      @apply text-gray-600;
+    }
+  }
+
+  .animation-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes ping {
+    75%,
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  .counter {
+    @apply absolute -right-2 bottom-0 flex h-6 w-6 select-none items-center justify-center rounded-full border-2 border-gray-300 text-sm;
+    background-color: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+  }
+
+  .counter-red {
+    @apply counter border-red-600 bg-red-600 text-white;
+  }
+
+  .naf-centered-fullscreen {
+    @apply bg-panel absolute inset-0 z-10 flex flex-col items-center justify-center gap-2;
+  }
+
+  .naf-bar {
+    @apply pointer-events-none absolute z-10 flex w-full items-center gap-4 [&>*]:pointer-events-auto;
+  }
+
+  .naf-top-bar-left {
+    @apply naf-bar left-6 top-6 justify-start;
+  }
+
+  .naf-top-bar-center {
+    @apply naf-bar top-6 justify-center;
+  }
+
+  .naf-top-bar-right {
+    @apply naf-bar right-6 top-6 justify-end;
+  }
+
+  .naf-bottom-bar-left {
+    @apply naf-bar bottom-6 left-6 justify-start;
+  }
+
+  .naf-bottom-bar-center {
+    @apply naf-bar bottom-6 justify-center;
+  }
+
+  .naf-bottom-bar-right {
+    @apply naf-bar bottom-6 right-6 justify-end;
+  }
+}
