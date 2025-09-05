@@ -1,6 +1,8 @@
 /* global AFRAME */
 import './player-info';
 import './change-room';
+import './car-pusher';
+import './follow-entity';
 
 AFRAME.registerComponent('spawn-in-circle', {
   schema: {

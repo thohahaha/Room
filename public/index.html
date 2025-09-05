@@ -52,6 +52,7 @@
       gltf-model="meshoptDecoderPath:https://unpkg.com/meshoptimizer@0.19.0/meshopt_decoder.js"
       raycaster="far: 100; objects: .clickable,[link];"
       cursor="rayOrigin: mouse"
+      physics="driver: cannon; debug: true;"
     >
       <a-assets>
         <template id="avatar-template">
@@ -70,6 +71,7 @@
 
       <a-entity id="scene">
         <a-entity environment="preset:forest;shadow:true"></a-entity>
+        <a-plane static-body position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
         <a-entity light="type:ambient;intensity:0.5"></a-entity>
         <a-mirror id="mirror" position="0 1.8 -3" scale="5 3 1" layers="0,3">
           <a-box color="black" position="0 0 -0.02" scale="1.02 1.02 0.01"></a-box>
@@ -100,10 +102,29 @@
             will-disable-motion="true"
           ></a-waypoint>
         </a-cylinder>
+        <!-- The invisible physics object for the car -->
+        <a-box
+          id="ferrari-physics-box"
+          visible="false"
+          position="0 0.6 -5"
+          width="1.8"
+          height="1.2"
+          depth="4"
+          dynamic-body="shape: box; mass: 50; body-id: ferrariBody"
+        ></a-box>
+
+        <!-- The visual model of the car, which now just follows the physics object -->
+        <a-entity
+          id="ferrari"
+          gltf-model="url(assets/ferrari.glb)"
+          scale="1 1 1"
+          follow-entity="target: #ferrari-physics-box"
+        ></a-entity>
       </a-entity>
 
       <a-entity
         id="rig"
+        car-pusher
         cursor-teleport="cameraRig: #rig; cameraHead: #player; collisionEntities: .environmentGround; ignoreEntities: .clickable,[link]"
         simple-navmesh-constraint="navmesh:.environmentGround,.environmentDressing;fall:10;height:0;exclude:.navmesh-hole;"
         movement-controls="fly:false;controls: gamepad, trackpad, keyboard, nipple;"
@@ -111,9 +132,7 @@
         networked="template:#avatar-template;attachTemplateToLocal:false"
         player-info
       >
-        <a-entity id="player" class="camera" camera position="0 1.6 0" look-controls>
-          <a-box obb-collider visible="false" height="0.4" depth="0.4" width="0.4"></a-box>
-        </a-entity>
+        <a-entity id="player" class="camera" camera position="0 1.6 0" look-controls> </a-entity>
         <a-entity
           id="left-hand"
           networked-hand-controls="hand: left"
