@@ -73,7 +73,7 @@
         <a-entity environment="preset:forest;shadow:true"></a-entity>
         <a-plane static-body position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
         <a-entity light="type:ambient;intensity:0.5"></a-entity>
-        <a-mirror id="mirror" position="0 1.8 -3" scale="5 3 1" layers="0,3">
+        <a-mirror id="mirror" class="collidable" position="0 1.8 -3" scale="5 3 1" layers="0,3">
           <a-box color="black" position="0 0 -0.02" scale="1.02 1.02 0.01"></a-box>
         </a-mirror>
         <a-link
@@ -84,7 +84,7 @@
           image="#thumbJapan"
           ><a-box position="0 0 0.5" obb-collider visible="false"></a-box
         ></a-link>
-        <a-cylinder radius="0.25" height="0.4" position="1.5 0.2 -2" rotation="0 180 0">
+        <a-cylinder class="collidable" radius="0.25" height="0.4" position="1.5 0.2 -2" rotation="0 180 0">
           <a-waypoint
             id="seat1"
             position="0 0.22 0"
@@ -93,7 +93,7 @@
             will-disable-motion="true"
           ></a-waypoint>
         </a-cylinder>
-        <a-cylinder radius="0.25" height="0.4" position="0.3 0.2 -2" rotation="0 180 0">
+        <a-cylinder class="collidable" radius="0.25" height="0.4" position="0.3 0.2 -2" rotation="0 180 0">
           <a-waypoint
             id="seat2"
             position="0 0.22 0"
@@ -105,12 +105,12 @@
         <!-- The invisible physics object for the car -->
         <a-box
           id="ferrari-physics-box"
+          class="collidable"
           visible="false"
           position="0 0.6 -5"
           width="1.8"
           height="1.2"
           depth="4"
-          dynamic-body="shape: box; mass: 50; body-id: ferrariBody"
         ></a-box>
 
         <!-- The visual model of the car, which now just follows the physics object -->
@@ -124,6 +124,7 @@
 
       <a-entity
         id="rig"
+        simple-collider="debug: true;"
         car-pusher
         cursor-teleport="cameraRig: #rig; cameraHead: #player; collisionEntities: .environmentGround; ignoreEntities: .clickable,[link]"
         simple-navmesh-constraint="navmesh:.environmentGround,.environmentDressing;fall:10;height:0;exclude:.navmesh-hole;"
@@ -150,6 +151,69 @@
           blink-controls="rotateOnTeleport: false; cameraRig: #rig; teleportOrigin: #player; collisionEntities: .navmesh;"
         ></a-entity>
       </a-entity>
+    <script>
+        AFRAME.registerComponent('simple-collider', {
+          schema: {
+            distance: {type: 'number', default: 0.5},
+            debug: {type: 'boolean', default: false}
+          },
+
+          init: function () {
+            this.raycaster = new THREE.Raycaster();
+            this.directions = [
+              new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1),
+              new THREE.Vector3(-1, 0, 0), new THREE.Vector3(1, 0, 0),
+              new THREE.Vector3(-0.7, 0, -0.7), new THREE.Vector3(0.7, 0, -0.7),
+              new THREE.Vector3(-0.7, 0, 0.7), new THREE.Vector3(0.7, 0, 0.7)
+            ];
+            if (this.data.debug) {
+              this.lines = {};
+              for (let i = 0; i < this.directions.length; i++) {
+                const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+                const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                this.lines[i] = new THREE.Line(geometry, material);
+                this.el.sceneEl.object3D.add(this.lines[i]);
+              }
+            }
+          },
+
+          tick: function () {
+            const el = this.el;
+            const center = new THREE.Vector3();
+            el.object3D.getWorldPosition(center);
+
+            const collidableEls = el.sceneEl.querySelectorAll('.collidable');
+            const collidableMeshes = [];
+            collidableEls.forEach(collidableEl => {
+              const mesh = collidableEl.getObject3D('mesh');
+              if (mesh) { collidableMeshes.push(mesh); }
+            });
+
+            if (collidableMeshes.length === 0) return;
+
+            for (let i = 0; i < this.directions.length; i++) {
+              const direction = this.directions[i].clone().applyQuaternion(el.object3D.quaternion);
+              this.raycaster.set(center, direction);
+              this.raycaster.far = this.data.distance;
+
+              const intersects = this.raycaster.intersectObjects(collidableMeshes, true);
+
+              if (intersects.length > 0 && intersects[0].distance < this.data.distance) {
+                const overlap = this.data.distance - intersects[0].distance;
+                const pushback = direction.clone().negate().multiplyScalar(overlap);
+                el.object3D.position.add(pushback);
+                break;
+              }
+              
+              if (this.data.debug) {
+                const start = center.clone();
+                const end = center.clone().add(direction.multiplyScalar(this.data.distance));
+                this.lines[i].geometry.setFromPoints([start, end]);
+              }
+            }
+          }
+        });
+      </script>
     </a-scene>
   </body>
 </html>
