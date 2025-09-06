@@ -59,23 +59,26 @@
       </a-assets>
 
       <a-entity id="scene">
-        <a-entity environment="preset:forest;shadow:true"></a-entity>
-        <a-plane class="ground" position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
+        <a-gltf-model src="assets/sekolah.glb" position="0 -10 0" scale="2 2 2" rotation="0 0 0"></a-gltf-model>
+        <!-- Collision box for the school building -->
+        <a-box class="collidable" position="0 -8 0" width="20" height="8" depth="20" visible="false"></a-box>
+        <a-plane class="ground" position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="true"></a-plane>
         <a-entity light="type:ambient;intensity:0.5"></a-entity>
         
         <a-mirror id="mirror" class="collidable" position="0 1.8 -3" scale="5 3 1" layers="0,3">
           <a-box color="black" position="0 0 -0.02" scale="1.02 1.02 0.01"></a-box>
         </a-mirror>
         
-        <a-link href="japan.html" position="-2 1.5 3" image="#thumbJapan"></a-link>
-        
         <a-cylinder class="collidable" radius="0.25" height="0.4" position="1.5 0.2 -2" rotation="0 180 0"></a-cylinder>
         <a-cylinder class="collidable" radius="0.25" height="0.4" position="0.3 0.2 -2" rotation="0 180 0"></a-cylinder>
         
-        <!-- Invisible body for the car -->
-        <a-box id="ferrari-body" class="collidable" pushable position="0 0.6 -7" width="1.8" height="0.1" depth="4" visible="false"></a-box>
-        <!-- Visual model for the car -->
-        <a-entity id="ferrari" gltf-model="url(assets/ferrari.glb)" follow="target: #ferrari-body;" scale="1 1 1"></a-entity>
+        <!-- Car collision system -->
+        <a-entity id="car-group" position="0 0 -5">
+          <!-- Main collision body for the car -->
+          <a-box id="ferrari-body" class="collidable" pushable position="0 0.6 0" width="1.8" height="1.2" depth="4.0" visible="false"></a-box>
+          <!-- Visual model for the car -->
+          <a-entity id="ferrari" gltf-model="url(assets/ferrari.glb)" position="0 0 0" scale="1 1 1"></a-entity>
+        </a-entity>
 
       </a-entity>
 
@@ -99,18 +102,34 @@
 
       // Player collider: stops the player from penetrating any .collidable object
       AFRAME.registerComponent('collider', {
-        schema: { distance: { default: 0.7 } },
+        schema: { distance: { default: 1.2 } },
         init: function () {
           this.raycaster = new THREE.Raycaster();
           this.lastSafePosition = new THREE.Vector3();
-          this.directions = [new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(1, 0, 0)];
-          this.el.addEventListener('loaded', () => this.el.object3D.getWorldPosition(this.lastSafePosition));
+          this.directions = [
+            new THREE.Vector3(0, 0, -1), // forward
+            new THREE.Vector3(0, 0, 1),  // backward
+            new THREE.Vector3(-1, 0, 0), // left
+            new THREE.Vector3(1, 0, 0),  // right
+            new THREE.Vector3(-0.7, 0, -0.7), // diagonal front-left
+            new THREE.Vector3(0.7, 0, -0.7),  // diagonal front-right
+            new THREE.Vector3(-0.7, 0, 0.7),  // diagonal back-left
+            new THREE.Vector3(0.7, 0, 0.7)    // diagonal back-right
+          ];
+          this.el.addEventListener('loaded', () => {
+            this.el.object3D.getWorldPosition(this.lastSafePosition);
+          });
         },
         tick: function (time, delta) {
           const collidableEls = this.el.sceneEl.querySelectorAll('.collidable');
           if (collidableEls.length === 0) return;
+          
           const collidables = [];
-          collidableEls.forEach(el => collidables.push(el.object3D));
+          collidableEls.forEach(el => {
+            if (el.object3D) {
+              collidables.push(el.object3D);
+            }
+          });
 
           let collision = false;
           for (const dir of this.directions) {
@@ -121,10 +140,11 @@
 
             if (intersects.length > 0 && intersects[0].distance < this.data.distance) {
               const hitEl = intersects[0].object.el;
-              if (hitEl && hitEl.components.pushable) {
-                const pushStrength = 0.002;
+              if (hitEl && hitEl.components && hitEl.components.pushable) {
+                const pushStrength = 0.02; // Increased push strength
                 const pushVector = worldDir.clone().multiplyScalar(pushStrength * delta);
                 hitEl.components.pushable.push(pushVector);
+                console.log('Pushing object:', hitEl.id, 'with vector:', pushVector);
               }
               this.el.object3D.position.copy(this.lastSafePosition);
               collision = true;
@@ -142,11 +162,44 @@
         init: function () {
           this.raycaster = new THREE.Raycaster();
           this.downVector = new THREE.Vector3(0, -1, 0);
+          this.velocity = new THREE.Vector3();
+          this.friction = 0.92;
         },
         push: function(vector) {
-          this.el.object3D.position.add(vector);
+          this.velocity.add(vector);
+          
+          // If this element has a parent group, move the entire group
+          const parentGroup = this.el.parentNode;
+          if (parentGroup && parentGroup.id === 'car-group') {
+            parentGroup.object3D.position.add(vector);
+          } else {
+            this.el.object3D.position.add(vector);
+          }
+          
+          // Update all connected objects (like the visual ferrari model)
+          const followingElements = this.el.sceneEl.querySelectorAll('[follow]');
+          followingElements.forEach(follower => {
+            const followComponent = follower.components.follow;
+            if (followComponent && followComponent.data.target === this.el) {
+              follower.object3D.position.copy(this.el.object3D.position);
+            }
+          });
         },
         tick: function() {
+          // Apply friction
+          this.velocity.multiplyScalar(this.friction);
+          
+          // Apply small remaining velocity
+          if (this.velocity.length() > 0.001) {
+            const parentGroup = this.el.parentNode;
+            if (parentGroup && parentGroup.id === 'car-group') {
+              parentGroup.object3D.position.add(this.velocity.clone().multiplyScalar(0.1));
+            } else {
+              this.el.object3D.position.add(this.velocity.clone().multiplyScalar(0.1));
+            }
+          }
+          
+          // Apply gravity/ground constraint
           const groundEls = this.el.sceneEl.querySelectorAll('.ground, .environmentGround');
           if (groundEls.length === 0) return;
           const grounds = [];
@@ -155,7 +208,7 @@
           this.raycaster.set(this.el.object3D.position, this.downVector);
           const intersects = this.raycaster.intersectObjects(grounds, true);
           if (intersects.length > 0) {
-            const height = this.el.getAttribute('geometry').height;
+            const height = this.el.getAttribute('height') || this.el.getAttribute('geometry')?.height || 0.1;
             this.el.object3D.position.y = intersects[0].point.y + height / 2;
           }
         }
