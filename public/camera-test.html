@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hand Tracking Test - Chrome Compatible</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: white;
+      }
+      
+      .controls {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 9999;
+        background: rgba(0,0,0,0.8);
+        padding: 20px;
+        border-radius: 10px;
+        border: 2px solid #4CAF50;
+      }
+      
+      .btn {
+        padding: 12px 24px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        margin: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: all 0.3s;
+      }
+      
+      .btn:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+      }
+      
+      .btn.active {
+        background: #FF9800;
+      }
+      
+      .status {
+        margin: 10px 0;
+        padding: 8px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      
+      .error {
+        color: #f44336;
+      }
+      
+      .success {
+        color: #4CAF50;
+      }
+      
+      .warning {
+        color: #ff9800;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <h2>🖐️ Hand Tracking Test</h2>
+      <button id="cameraBtn" class="btn" onclick="toggleCamera()">📷 Start Camera</button>
+      <button id="testBtn" class="btn" onclick="testBasicFeatures()">🧪 Test Features</button>
+      <div id="status" class="status">Ready to test</div>
+      <div id="cameraStatus" class="status">Camera: Not started</div>
+      <div id="mediaSupport" class="status">Checking browser support...</div>
+    </div>
+
+    <!-- Camera preview -->
+    <video id="videoElement" 
+           autoplay 
+           muted 
+           playsinline
+           style="position: fixed; top: 20px; right: 20px; width: 320px; height: 240px; border: 2px solid #4CAF50; border-radius: 8px; display: none;">
+    </video>
+
+    <script>
+      let cameraActive = false;
+      let stream = null;
+
+      // Check browser support
+      function checkBrowserSupport() {
+        const statusEl = document.getElementById('mediaSupport');
+        const issues = [];
+
+        if (!navigator.mediaDevices) {
+          issues.push('MediaDevices API not supported');
+        }
+
+        if (!navigator.mediaDevices.getUserMedia) {
+          issues.push('getUserMedia not supported');
+        }
+
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+          issues.push('HTTPS required for camera access (except localhost)');
+        }
+
+        if (issues.length === 0) {
+          statusEl.textContent = '✅ Browser support: OK';
+          statusEl.className = 'status success';
+        } else {
+          statusEl.innerHTML = '❌ Issues found:<br>' + issues.join('<br>');
+          statusEl.className = 'status error';
+        }
+
+        return issues.length === 0;
+      }
+
+      function updateStatus(message, type = 'normal') {
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = message;
+        statusEl.className = `status ${type}`;
+        console.log(message);
+      }
+
+      function updateCameraStatus(message, type = 'normal') {
+        const statusEl = document.getElementById('cameraStatus');
+        statusEl.textContent = `Camera: ${message}`;
+        statusEl.className = `status ${type}`;
+      }
+
+      async function toggleCamera() {
+        const btn = document.getElementById('cameraBtn');
+        const video = document.getElementById('videoElement');
+
+        if (!cameraActive) {
+          try {
+            btn.textContent = '⏳ Starting...';
+            btn.disabled = true;
+            updateCameraStatus('Requesting access...', 'warning');
+
+            const constraints = {
+              video: {
+                width: { ideal: 640, max: 1280 },
+                height: { ideal: 480, max: 720 },
+                facingMode: 'user'
+              },
+              audio: false
+            };
+
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            video.style.display = 'block';
+
+            await new Promise((resolve, reject) => {
+              video.onloadedmetadata = () => {
+                video.play().then(resolve).catch(reject);
+              };
+              video.onerror = reject;
+            });
+
+            btn.textContent = '🛑 Stop Camera';
+            btn.classList.add('active');
+            btn.disabled = false;
+            cameraActive = true;
+            updateCameraStatus('Active ✅', 'success');
+            updateStatus('Camera started successfully!', 'success');
+
+          } catch (error) {
+            console.error('Camera error:', error);
+            btn.textContent = '📷 Start Camera';
+            btn.disabled = false;
+            updateCameraStatus(`Failed: ${error.message}`, 'error');
+            updateStatus(`Camera error: ${error.message}`, 'error');
+
+            if (error.name === 'NotAllowedError') {
+              updateStatus('Camera permission denied. Click the 🔒 icon in address bar to allow camera access.', 'error');
+            }
+          }
+        } else {
+          // Stop camera
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+          }
+          video.style.display = 'none';
+          video.srcObject = null;
+
+          btn.textContent = '📷 Start Camera';
+          btn.classList.remove('active');
+          cameraActive = false;
+          updateCameraStatus('Stopped', 'warning');
+          updateStatus('Camera stopped', 'warning');
+        }
+      }
+
+      function testBasicFeatures() {
+        updateStatus('Testing basic features...', 'warning');
+        
+        const tests = [
+          { name: 'MediaDevices API', test: () => !!navigator.mediaDevices },
+          { name: 'getUserMedia', test: () => !!navigator.mediaDevices?.getUserMedia },
+          { name: 'WebGL Support', test: () => {
+            try {
+              const canvas = document.createElement('canvas');
+              return !!canvas.getContext('webgl') || !!canvas.getContext('experimental-webgl');
+            } catch {
+              return false;
+            }
+          }},
+          { name: 'HTTPS/Localhost', test: () => location.protocol === 'https:' || location.hostname === 'localhost' },
+          { name: 'Canvas 2D', test: () => {
+            try {
+              const canvas = document.createElement('canvas');
+              return !!canvas.getContext('2d');
+            } catch {
+              return false;
+            }
+          }}
+        ];
+
+        const results = tests.map(test => ({
+          name: test.name,
+          passed: test.test()
+        }));
+
+        const passed = results.filter(r => r.passed).length;
+        const total = results.length;
+
+        let resultText = `Tests completed: ${passed}/${total} passed\n`;
+        results.forEach(r => {
+          resultText += `${r.passed ? '✅' : '❌'} ${r.name}\n`;
+        });
+
+        updateStatus(resultText.replace(/\n/g, '<br>'), passed === total ? 'success' : 'warning');
+        console.log('Test results:', results);
+      }
+
+      // Initialize
+      document.addEventListener('DOMContentLoaded', () => {
+        checkBrowserSupport();
+        updateStatus('Ready to test. Click "Start Camera" to begin.', 'normal');
+      });
+
+      // Error handling
+      window.addEventListener('error', (event) => {
+        updateStatus(`JavaScript error: ${event.message}`, 'error');
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        updateStatus(`Promise error: ${event.reason}`, 'error');
+      });
+    </script>
+  </body>
+</html>

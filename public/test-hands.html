@@ -1,0 +1,476 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hand Models Test - 3D Hand Tracking</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    
+    <!-- MediaPipe for hand detection with camera -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    
+    <!-- A-Frame Extras with FBX support -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+    
+    <script src="/hand-tracking-controls.js"></script>
+    
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: white;
+      }
+      
+      .controls {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 9999;
+        background: rgba(0,0,0,0.9);
+        padding: 20px;
+        border-radius: 10px;
+        border: 2px solid #4CAF50;
+        max-width: 300px;
+      }
+      
+      .btn {
+        padding: 12px 24px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        margin: 5px 0;
+        font-size: 14px;
+        font-weight: bold;
+        transition: all 0.3s;
+        width: 100%;
+      }
+      
+      .btn:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+      }
+      
+      .btn:disabled {
+        background: #666;
+        cursor: not-allowed;
+        transform: none;
+      }
+      
+      .btn.active {
+        background: #FF9800;
+      }
+      
+      .status {
+        margin: 10px 0;
+        padding: 8px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      
+      .error { color: #f44336; }
+      .success { color: #4CAF50; }
+      .warning { color: #ff9800; }
+      
+      .hand-status {
+        background: rgba(0,0,0,0.8);
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 10px;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene 
+      renderer="antialias: true"
+      background="color: #2196F3"
+      style="height: 100vh; width: 100vw;"
+      ar-hand-tracking-system="enabled: false; debug: false">
+      
+      <a-assets>
+        <a-asset-item id="leftHandModel" src="assets/left_hand.glb"></a-asset-item>
+        <a-asset-item id="rightHandModel" src="assets/right_hand.glb"></a-asset-item>
+        <a-asset-item id="handReference" src="assets/handReference.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- Lighting -->
+      <a-entity light="type:ambient;intensity:0.6"></a-entity>
+      <a-entity position="2 4 5" light="type:directional;intensity:0.8"></a-entity>
+
+      <!-- Camera -->
+      <a-entity id="rig" position="0 1.6 0">
+        <a-camera look-controls wasd-controls></a-camera>
+        
+        <!-- Hand Models -->
+        <a-entity id="leftHandTracking" 
+          ar-hand-tracking-controls="hand: left; model: assets/left_hand.glb; smoothing: 0.7; scale: 0.01"
+          position="-0.3 1.3 -0.3" 
+          rotation="0 0 180"
+          visible="false">
+        </a-entity>
+        
+        <a-entity id="rightHandTracking" 
+          ar-hand-tracking-controls="hand: right; model: assets/right_hand.glb; smoothing: 0.7; scale: 0.01"
+          position="0.3 1.3 -0.3" 
+          rotation="0 180 0"
+          visible="false">
+        </a-entity>
+      </a-entity>
+
+      <!-- Ground -->
+      <a-plane position="0 0 -4" rotation="-90 0 0" width="10" height="10" color="#4CAF50" opacity="0.8"></a-plane>
+    </a-scene>
+
+    <div class="controls">
+      <h2>🖐️ 3D Hand Tracking Test</h2>
+      <button id="cameraBtn" class="btn" onclick="toggleCamera()">📷 Start Camera</button>
+      <button id="handBtn" class="btn" onclick="toggleHandTracking()" disabled>🖐️ Start Hand Tracking</button>
+      <button id="debugBtn" class="btn" onclick="toggleDebug()">🐛 Debug Mode</button>
+      <button id="testBtn" class="btn" onclick="testHandModels()">🧪 Test Hand Models</button>
+      
+      <div id="status" class="status">Ready - Start camera first</div>
+      <div id="cameraStatus" class="status">Camera: Not started</div>
+      
+      <div class="hand-status">
+        <div id="left-hand-status">👈 Left: Not detected</div>
+        <div id="right-hand-status">👉 Right: Not detected</div>
+      </div>
+      
+      <div style="margin-top: 10px; font-size: 11px; color: #81C784;">
+        💡 Use WASD to move, mouse to look around<br>
+        📱 Allow camera permission when prompted<br>
+        🧪 Click "Test Hand Models" to force show hands
+      </div>
+    </div>
+
+    <!-- Camera elements -->
+    <video id="input_video" 
+           autoplay 
+           muted 
+           playsinline
+           style="position: fixed; top: 20px; right: 20px; width: 240px; height: 180px; border: 2px solid #4CAF50; border-radius: 8px; display: none;">
+    </video>
+    <canvas id="output_canvas" 
+            style="position: fixed; top: 210px; right: 20px; width: 240px; height: 180px; border: 2px solid #FF9800; border-radius: 8px; display: none;">
+    </canvas>
+
+    <!-- Hand tracking status indicator -->
+    <div id="tracking-indicator" style="position: fixed; top: 400px; right: 20px; z-index: 1000; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; display: none;">
+      <div>🎯 Hand Tracking Active</div>
+    </div>
+
+    <script>
+      let cameraActive = false;
+      let handTrackingActive = false;
+      let debugMode = false;
+      let stream = null;
+
+      function updateStatus(message, type = 'normal') {
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = message;
+        statusEl.className = `status ${type}`;
+        console.log(message);
+      }
+
+      function updateCameraStatus(message, type = 'normal') {
+        const statusEl = document.getElementById('cameraStatus');
+        statusEl.textContent = `Camera: ${message}`;
+        statusEl.className = `status ${type}`;
+      }
+
+      async function toggleCamera() {
+        const btn = document.getElementById('cameraBtn');
+        const handBtn = document.getElementById('handBtn');
+        const video = document.getElementById('videoElement') || document.getElementById('input_video');
+
+        if (!cameraActive) {
+          try {
+            btn.textContent = '⏳ Starting Camera...';
+            btn.disabled = true;
+            updateCameraStatus('Requesting access...', 'warning');
+
+            const constraints = {
+              video: {
+                width: { ideal: 640, max: 1280 },
+                height: { ideal: 480, max: 720 },
+                facingMode: 'user'
+              },
+              audio: false
+            };
+
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            
+            if (debugMode) {
+              video.style.display = 'block';
+            }
+
+            await new Promise((resolve, reject) => {
+              video.onloadedmetadata = () => {
+                video.play().then(resolve).catch(reject);
+              };
+              video.onerror = reject;
+            });
+
+            btn.textContent = '🛑 Stop Camera';
+            btn.classList.add('active');
+            btn.disabled = false;
+            handBtn.disabled = false;
+            cameraActive = true;
+            updateCameraStatus('Active ✅', 'success');
+            updateStatus('Camera ready! Now you can start hand tracking.', 'success');
+
+          } catch (error) {
+            console.error('Camera error:', error);
+            btn.textContent = '📷 Start Camera';
+            btn.disabled = false;
+            handBtn.disabled = true;
+            updateCameraStatus(`Failed: ${error.message}`, 'error');
+            
+            if (error.name === 'NotAllowedError') {
+              updateStatus('Camera permission denied. Click the 🔒 icon in address bar to allow camera access.', 'error');
+            } else {
+              updateStatus(`Camera error: ${error.message}`, 'error');
+            }
+          }
+        } else {
+          // Stop camera
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+          }
+          video.style.display = 'none';
+          video.srcObject = null;
+
+          // Also stop hand tracking
+          if (handTrackingActive) {
+            toggleHandTracking();
+          }
+
+          btn.textContent = '📷 Start Camera';
+          btn.classList.remove('active');
+          handBtn.disabled = true;
+          cameraActive = false;
+          updateCameraStatus('Stopped', 'warning');
+          updateStatus('Camera stopped', 'warning');
+        }
+      }
+
+      function toggleHandTracking() {
+        const btn = document.getElementById('handBtn');
+        const scene = document.querySelector('a-scene');
+        
+        if (!handTrackingActive) {
+          if (!cameraActive) {
+            updateStatus('Please start camera first!', 'error');
+            return;
+          }
+          
+          btn.textContent = '⏳ Starting Hand Tracking...';
+          btn.disabled = true;
+          
+          console.log('=== Starting Hand Tracking ===');
+          console.log('Scene element:', scene);
+          console.log('Left hand element:', document.getElementById('leftHandTracking'));
+          console.log('Right hand element:', document.getElementById('rightHandTracking'));
+          console.log('MediaPipe Hands available:', typeof Hands !== 'undefined');
+          console.log('MediaPipe Camera available:', typeof Camera !== 'undefined');
+          
+          // Enable hand tracking system
+          scene.setAttribute('ar-hand-tracking-system', 'enabled', true);
+          
+          setTimeout(() => {
+            btn.textContent = '🛑 Stop Hand Tracking';
+            btn.classList.add('active');
+            btn.disabled = false;
+            handTrackingActive = true;
+            updateStatus('Hand tracking active! Move your hands in front of camera.', 'success');
+            
+            // Check if hand tracking components are initialized
+            setTimeout(() => {
+              const leftHandComp = document.getElementById('leftHandTracking')?.components?.['ar-hand-tracking-controls'];
+              const rightHandComp = document.getElementById('rightHandTracking')?.components?.['ar-hand-tracking-controls'];
+              console.log('Hand tracking components:', { leftHandComp, rightHandComp });
+            }, 500);
+          }, 1000);
+        } else {
+          // Disable hand tracking system
+          scene.setAttribute('ar-hand-tracking-system', 'enabled', false);
+          btn.textContent = '🖐️ Start Hand Tracking';
+          btn.classList.remove('active');
+          handTrackingActive = false;
+          updateStatus('Hand tracking stopped', 'warning');
+          
+          // Hide hand models
+          const leftHand = document.getElementById('leftHandTracking');
+          const rightHand = document.getElementById('rightHandTracking');
+          if (leftHand) leftHand.setAttribute('visible', false);
+          if (rightHand) rightHand.setAttribute('visible', false);
+          
+          console.log('Hand tracking stopped');
+        }
+      }
+
+      function toggleDebug() {
+        const btn = document.getElementById('debugBtn');
+        const scene = document.querySelector('a-scene');
+        
+        debugMode = !debugMode;
+        
+        scene.setAttribute('ar-hand-tracking-system', 'debug', debugMode);
+        btn.textContent = `🐛 Debug: ${debugMode ? 'On' : 'Off'}`;
+        btn.classList.toggle('active', debugMode);
+        
+        const canvasElement = document.getElementById('output_canvas');
+        const videoElement = document.getElementById('input_video');
+        
+        if (canvasElement && videoElement && cameraActive) {
+          canvasElement.style.display = debugMode ? 'block' : 'none';
+          videoElement.style.display = debugMode ? 'block' : 'none';
+        }
+        
+        updateStatus(`Debug mode: ${debugMode ? 'enabled' : 'disabled'}`, debugMode ? 'warning' : 'normal');
+      }
+
+      function testHandModels() {
+        console.log('=== Testing Hand Models ===');
+        
+        const leftHand = document.getElementById('leftHandTracking');
+        const rightHand = document.getElementById('rightHandTracking');
+        
+        if (leftHand && rightHand) {
+          console.log('Found hand elements, testing movement...');
+          
+          // Force show hands
+          leftHand.setAttribute('visible', true);
+          rightHand.setAttribute('visible', true);
+          
+          // Move them to visible positions
+          leftHand.setAttribute('position', '-0.5 1.5 -1');
+          rightHand.setAttribute('position', '0.5 1.5 -1');
+          
+          // Add some rotation
+          leftHand.setAttribute('rotation', '0 -20 0');
+          rightHand.setAttribute('rotation', '0 20 0');
+          
+          updateStatus('Hand models visible! Watch them move...', 'success');
+          console.log('✅ Hand models positioned and made visible');
+          
+          // Start a more obvious animation
+          let testTime = 0;
+          const animateTest = () => {
+            if (testTime < 200) { // Run for 10 seconds
+              testTime++;
+              const wave = Math.sin(testTime * 0.05) * 0.3;
+              const upDown = Math.cos(testTime * 0.03) * 0.2;
+              
+              // More dramatic movement
+              const leftX = -0.5 + wave;
+              const leftY = 1.5 + upDown;
+              const leftZ = -1 + Math.sin(testTime * 0.02) * 0.3;
+              
+              const rightX = 0.5 - wave;
+              const rightY = 1.5 - upDown;
+              const rightZ = -1 + Math.cos(testTime * 0.02) * 0.3;
+              
+              leftHand.setAttribute('position', `${leftX} ${leftY} ${leftZ}`);
+              rightHand.setAttribute('position', `${rightX} ${rightY} ${rightZ}`);
+              
+              // Add rotation animation
+              const rotY = Math.sin(testTime * 0.04) * 45;
+              leftHand.setAttribute('rotation', `0 ${-20 + rotY} 0`);
+              rightHand.setAttribute('rotation', `0 ${20 - rotY} 0`);
+              
+              if (testTime % 20 === 0) {
+                console.log(`Animation frame ${testTime}: Left(${leftX.toFixed(2)}, ${leftY.toFixed(2)}, ${leftZ.toFixed(2)})`);
+              }
+              
+              setTimeout(animateTest, 50);
+            } else {
+              updateStatus('Animation test completed!', 'success');
+              console.log('🎬 Animation test finished');
+            }
+          };
+          animateTest();
+          
+        } else {
+          updateStatus('Hand models not found!', 'error');
+          console.error('❌ Hand elements not found:', { leftHand, rightHand });
+        }
+      }
+
+      // Initialize
+      document.addEventListener('DOMContentLoaded', () => {
+        updateStatus('Ready! Start camera to begin hand tracking test.', 'normal');
+        
+        console.log('=== Initializing Hand Tracking Test ===');
+        console.log('Available scripts check:');
+        console.log('- AFRAME:', typeof AFRAME !== 'undefined');
+        console.log('- MediaPipe Hands:', typeof Hands !== 'undefined');
+        console.log('- MediaPipe Camera:', typeof Camera !== 'undefined');
+        console.log('- THREE.js:', typeof THREE !== 'undefined');
+        
+        // Check if models load successfully
+        const models = document.querySelectorAll('a-gltf-model');
+        let loadedModels = 0;
+        
+        console.log(`Found ${models.length} models to load`);
+        
+        models.forEach((model, index) => {
+          const src = model.getAttribute('src');
+          console.log(`Model ${index + 1} source:`, src);
+          
+          model.addEventListener('model-loaded', () => {
+            loadedModels++;
+            console.log(`✅ Model ${index + 1} loaded successfully: ${src}`);
+            if (loadedModels === models.length) {
+              updateStatus('All 3D hand models loaded! Ready to test tracking.', 'success');
+              console.log('🎉 All models loaded successfully!');
+            }
+          });
+          
+          model.addEventListener('model-error', (event) => {
+            console.error(`❌ Model ${index + 1} failed to load: ${src}`, event);
+            updateStatus(`Failed to load hand model ${index + 1}`, 'error');
+          });
+        });
+        
+        // Test hand tracking components initialization
+        setTimeout(() => {
+          console.log('=== Testing Hand Tracking Components ===');
+          const leftHand = document.getElementById('leftHandTracking');
+          const rightHand = document.getElementById('rightHandTracking');
+          console.log('Left hand element:', leftHand);
+          console.log('Right hand element:', rightHand);
+          
+          if (leftHand) {
+            console.log('Left hand component:', leftHand.components);
+            console.log('Left hand position:', leftHand.getAttribute('position'));
+            console.log('Left hand visible:', leftHand.getAttribute('visible'));
+          }
+          
+          if (rightHand) {
+            console.log('Right hand component:', rightHand.components);
+            console.log('Right hand position:', rightHand.getAttribute('position'));
+            console.log('Right hand visible:', rightHand.getAttribute('visible'));
+          }
+        }, 2000);
+      });
+
+      // Error handling
+      window.addEventListener('error', (event) => {
+        updateStatus(`Error: ${event.message}`, 'error');
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        updateStatus(`Promise error: ${event.reason}`, 'error');
+      });
+    </script>
+  </body>
+</html>
